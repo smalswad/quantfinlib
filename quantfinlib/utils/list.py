@@ -31,3 +31,30 @@ def list_intsect(l1, l2, duplicates=False):
         lint = list(dict.fromkeys(lint))
         
     return lint
+
+
+def list_items_with_pattern(l, pattern, thresh=90):
+    '''
+    Return list items which contain pattern.
+
+    Parameters
+    ----------
+    l : list
+        List of strings.
+    pattern : string
+        Pattern to find in list items.
+    thresh : int, optional
+        Threshhold for fuzzy comparison to identify pattern. The default is 90.
+
+    Returns
+    -------
+    list
+        List containing only items with pattern.
+
+    '''
+    return [item for item in l if item.find(pattern) >= thresh]
+
+
+
+
+

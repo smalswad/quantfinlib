@@ -307,7 +307,6 @@ def calc_portf_ret(ret, w, rf=None, excess=True):
     
     return portf_ret
 
-
 def risk_comp(data, how, data2=None):
     '''
     Calculate risk composition (returns) based on specified method
@@ -364,3 +363,31 @@ def risk_comp(data, how, data2=None):
                          "composition parameter 'how'.")
                          
     return out
+
+def vw_ret(group, avg_name, weight_name):
+    '''
+    Helper function to calculate value-weighted portfolio returns
+
+    Parameters
+    ----------
+    group : pd.DataFrame
+        Goupby frame or whole data frame in long format.
+    avg_name : string
+        Column name of return values.
+    weight_name : string
+        Column name of determining weight column.
+
+    Returns
+    -------
+    float
+        VW return.
+
+    '''
+    d = group[avg_name]
+    w = group[weight_name]
+    try:
+        return (d * w).sum() / w.sum()
+    except ZeroDivisionError:
+        return np.nan
+    
+    
