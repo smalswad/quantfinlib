@@ -60,7 +60,7 @@ def grs_test(dep_var, indep_var):
     # Collect variables
     alphas = res.intercept_ 
     residuals = pd.DataFrame(res.residuals) 
-    sigma = residuals.T.dot(residuals).values/(tau-k-1) # Calcualte sigma estimate
+    sigma = residuals.T.dot(residuals).values/(tau-k-1) # Calculate sigma estimate
     mu_f = indep_var.mean().values # Mean factor returns
     omega = (indep_var - mu_f).T.dot(indep_var - mu_f).values/(tau-1) # Calculate omega estimate
    
