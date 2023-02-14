@@ -37,7 +37,7 @@ def idx_intersect(indices):
     Parameters
     ----------
     indices : list
-        list of pd.DataFrame.index to comapare.
+        list of pd.DataFrame.index to compare.
 
     Returns
     -------

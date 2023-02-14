@@ -133,7 +133,8 @@ class Portfolio(object):
 
 class FactorPortfolio(Portfolio):
     
-    def __init__(self, factor_model, *args, factor_weights=None, **kwargs):
+    def __init__(self, factor_model, *args, factor_weights=None, 
+                 factor_mrc=None, **kwargs):
         '''
         Create a portfolio which is relient on a factor model. 
 
@@ -143,6 +144,9 @@ class FactorPortfolio(Portfolio):
             Factor model containing all factor related information.
         factor_weights : np.array, shape(K,), optional
             Factor weights to use. The default is None.
+        factor_mrc : list, optional
+            Target marginal factor risk contributions, i.e. risk budget of total 
+            portfolio risk (e.g. equal risk). The default is None.
         *args : TYPE
             see documentation of Portfolio class.
         **kwargs : TYPE
@@ -155,10 +159,11 @@ class FactorPortfolio(Portfolio):
         '''
         self.model = factor_model 
         self.factor_weights = factor_weights
+        self.factor_target_rc = factor_mrc
         super().__init__(*args, **kwargs)     
                
     def calc_asset_weights(self, method='ew'):
-        if method=='inv_factor_vola':
+        if method=='inv_factor_vola' or method=='fixed_factor_rc':
             if self.factor_weights is None:
                 self.calc_factor_weights(method)
                 
@@ -213,7 +218,18 @@ class FactorPortfolio(Portfolio):
                 lambda_ = np.diag(self.model.orth_factor_sigma)
             
             self.factor_weights = \
-                (1/np.sqrt(lambda_)) / np.sum(1/np.sqrt(lambda_))         
+                (1/np.sqrt(lambda_)) / np.sum(1/np.sqrt(lambda_))  
+            
+        elif method=='fixed_factor_rc':
+            # Calculate factor weights based on fixed factor risk contriutions
+            if self.model.standard_model: 
+                sigma_ = self.model.factor_sigma
+            else:
+                sigma_ = self.model.orth_factor_sigma
+            
+            # Define initial weights just as EW
+            w0 = np.array([1/sigma_.shape[0]] * sigma_.shape[0])                
+            self.factor_weights = calc_rpo(w0, sigma_, self.factor_target_rc)
     
     def calc_number_of_bets(self):
         '''
