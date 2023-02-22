@@ -5,12 +5,29 @@ Created on Fri Jan 27 14:28:24 2023
 @author: smalswad
 """
 
-from quantfinlib.statistic.regression import LinearRegression
 import numpy as np
+import pandas as pd
 from scipy import stats
 
-import pandas as pd
+from quantfinlib.statistic.regression import LinearRegression
 
+def calc_raw_pval(t, tvals):
+    '''
+    Calculate raw pvalues based on vector of null test statistics.
+
+    Parameters
+    ----------
+    t : float
+        Scalar-valued test statistic (large values are indicative of H_1).
+    tvals : np.array, shape(M,)
+        Vector of null test statistics.
+
+    Returns
+    -------
+    univariate p-value.
+
+    '''
+    return (len(tvals[tvals >= t]) + 1)/(len(tvals) + 1)
 
 def grs_test(dep_var, indep_var):
     '''
@@ -87,3 +104,73 @@ def grs_test(dep_var, indep_var):
     sh2f_adj = sh2f * (tau-k-2)/tau - k/tau
      
     return (f_grs, p_grs, avg_abs_alpha, sh2f, sh2f_adj, sr, sh2a)
+
+def mht_step_m(tval, tval_boot, digits=3):
+    '''
+    Multiple hypothesis correction of p-values based on
+    
+    Romano, J. P., & Wolf, M. (2016). Efficient computation of adjusted 
+    p-values for resampling-based stepdown multiple testing. 
+    Statistics & Probability Letters, 113, 38-40.    
+
+    Parameters
+    ----------
+    tval : np.array, shape(s,)
+        Vector of test statistics.
+    tval_boot : np.array, shape(m,s)
+        Bootstrapped t-statistics.
+    digits : int, optional
+        Number of digits to be reported after coma. The default is 3.
+
+    Returns
+    -------
+    results: np.array, shape(S,3)
+        Test result array, containing the test statistics (c1), raw p-values (c2),
+        as well as adjusted p-values (c3)
+    '''
+    # Get dimensions
+    m,s = tval_boot.shape
+    
+    # Error handling
+    if s != len(tval):
+        raise ValueError("Length of tval and column number of tval_boot do"
+                         " not match!")
+   
+    # Calculate raw p-values
+    pval_raw = np.array([calc_raw_pval(tval[i], tval_boot[:,i]) \
+                         for i in range(s)])
+        
+    # Calculate adjusted p-values
+    pval_adj = np.zeros((s,))
+    # Sort t-values in descending order
+    r = np.argsort(-tval)    
+    tval_sorted = tval[r]
+    tval_boot_sorted = tval_boot[:,r]
+
+    max_stat = tval_boot_sorted.max(axis=1)
+    pval_adj[0] = calc_raw_pval(tval_sorted[0], max_stat)
+
+    for i in range(1,s):
+        max_stat = tval_boot_sorted[:,i:(s+1)].max(axis=1)
+        temp = calc_raw_pval(tval_sorted[i], max_stat)
+        pval_adj[i] = max(temp, pval_adj[i-1])
+    
+    # re-arrange adjusted p-values into original order of hypotheses
+    inv_r = np.zeros((s,), dtype=int)
+    inv_r[r] = np.arange(s, dtype=int)
+    pval_adj = pval_adj[inv_r]
+
+    # Combine tvalues with raw and adjusted p-values
+    result = np.column_stack((tval, pval_raw, pval_adj))
+
+    return result.round(digits)
+
+
+
+
+
+
+
+
+
+
