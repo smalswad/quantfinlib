@@ -72,7 +72,7 @@ class LinearRegression(linear_model.LinearRegression):
 
         # P-value for each beta. This is a two sided t-test, since the betas can be 
         # positive or negative.
-        self.pvalues = 1 - stats.t.cdf(abs(self.tstats_),df)
+        self.pvalues = 1 - stats.t.cdf(abs(self.tstats_), df)
         
         return self
 

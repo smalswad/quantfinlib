@@ -57,6 +57,8 @@ def fdp_step_m(z, z_null, gamma, alpha=0.05, n_max=50, disp=False):
     fwe_res : dict
         Results of the k_fwe routine where k is chosen such that it reaches the 
         desired FDP control.
+    k : int
+        Final k chosen. 
     '''
     # Start with k=1 
     k = 1    
@@ -65,7 +67,7 @@ def fdp_step_m(z, z_null, gamma, alpha=0.05, n_max=50, disp=False):
 
         # Stop iterating 
         rej = len(fwe_res['hypo_rej'])
-        if rej > 0 and rej < (k/gamma-1):
+        if rej < (k/gamma-1):
             if disp:
                 print(f'The final choices are k = {k} and rej = {rej}')
             break
@@ -73,7 +75,7 @@ def fdp_step_m(z, z_null, gamma, alpha=0.05, n_max=50, disp=False):
         # Increase k to the lower bound of the constraint, instead of k+=1
         k = int(max(np.floor(len(fwe_res['hypo_rej'])*gamma), k+1))
 
-    return fwe_res
+    return (fwe_res, k)
 
 def grs_test(dep_var, indep_var):
     '''
