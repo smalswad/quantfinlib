@@ -6,6 +6,26 @@ Created on Fri Jan 27 12:49:28 2023
 """
 
 
+def common_elements(lol, sort=False):
+    '''
+    Return elements that are stored in each sub-list.
+
+    Parameters
+    ----------
+    lol : list 
+        List of iterables.
+    sort : boolean, optional
+        Indicate whether output list shall be sorted. The default is False.
+
+    Returns
+    -------
+    list
+        List of common elements in each iterable in lol.
+    '''
+    same = list(set(lol[0]).intersection(*lol))
+    if sort:
+        same.sort()
+    return same
 
 def list_intsect(l1, l2, duplicates=False):
     '''
