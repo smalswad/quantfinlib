@@ -77,7 +77,7 @@ def fdp_k_fwer(z, z_null, gamma, alpha=0.05, n_max=50, disp=False):
 
     return (fwe_res, k)
 
-def factor_cand_test(ret, pre, cand, bs_samples, min_obs=36, print_res=False):
+def factor_cand_test(ret, pre, cand, bs_indices, min_obs=36, print_res=False):
     '''
     Factor test to identify significant factors of candidate set. Based on
     
@@ -92,8 +92,9 @@ def factor_cand_test(ret, pre, cand, bs_samples, min_obs=36, print_res=False):
         Return data of pre-selected factors, no missing data.
     cand : pd.DataFrame, shape(T, kc)
         Return data of candidate factors, no missing data.
-    bs_samples: List of pd.DataFrames [each with shape(T, N+kp+kc)] 
-        List of k different bootstrap samples of all used returns.  
+    bs_indices: List of lists 
+        List of k different bootstrap samples with length T each containing 
+        positional row indices.  
     min_obs : int, optional
         Minimum number of observations per time-series to be included. The 
         default is 36.
@@ -102,11 +103,17 @@ def factor_cand_test(ret, pre, cand, bs_samples, min_obs=36, print_res=False):
 
     Returns
     -------
+    sum_mm : np.array, shape(kc,)
+        test statistics of factor candidates being relevant contendors based on
+        means.
     pval_mm : np.array, shape(kc,)
         P-values of factor candidates being relevant contendors based on mean
         statistics.
     pval_mm_mult : float
         P-value for multiple testing based on mean statistics.
+    sum_dd : np.array, shape(kc,)
+        test statistics of factor candidates being relevant contendors based on
+        medians.
     pval_dd : np.array, shape(kc,)
         P-values of factor candidates being relevant contendors based on median
         statistics.
@@ -125,26 +132,27 @@ def factor_cand_test(ret, pre, cand, bs_samples, min_obs=36, print_res=False):
     sum_mm, sum_dd = _avg_statistics(ret, pre, cand, min_obs=min_obs)
     
     ##### Bootstrap #######
-    bslen = len(bs_samples)        
+    bslen = len(bs_indices)        
     boot_mm = list() # mc x b_size matrix of mean-based test statistics under null; rows are factors; columns are bootstrap samples
     boot_dd = list() # mc x b_size matrix of mean-based test statistics under null; rows are factors; columns are bootstrap samples
     
-    for i, boot in enumerate(bs_samples):
+    # Calculate orthogonal factor candidates, i.e. here just adjust mean
+    res = _regress(pre.values, cand)
+    fac_cand = pd.DataFrame(cand.values - res.intercept_,
+                            columns=cand.columns) 
+    
+    # Iterate over bootstrap samples
+    for i, boot in enumerate(bs_indices):
         
         if i % 100 == 0:
             print(f'Calculating {i}-th bootstrap sample.')
-        # Split bs_sample in ret, pre, and cand
-        ret_bb = boot.loc[:, ret.columns]
-        pre_bb = boot.loc[:, pre.columns]
-        cand_bb = boot.loc[:, cand.columns].values
-        
-        # Orthogonalize factor candidates
-        res = _regress(pre_bb.values, cand_bb)
-        fac_cand = pd.DataFrame(cand_bb - res.intercept_,
-                                columns=cand.columns) 
-    
+        # Get bootstrapped samples of ret, pre, and cand
+        ret_bb = ret.iloc[boot, :].reset_index(drop=True)
+        pre_bb = pre.iloc[boot, :].reset_index(drop=True)
+        cand_bb = fac_cand.iloc[boot, :].reset_index(drop=True)
+            
         # Calculate  statistics
-        sum_mm_bb, sum_dd_bb = _avg_statistics(ret_bb, pre_bb, fac_cand)
+        sum_mm_bb, sum_dd_bb = _avg_statistics(ret_bb, pre_bb, cand_bb)
         boot_mm.append(sum_mm_bb)
         boot_dd.append(sum_dd_bb)
     
@@ -174,7 +182,7 @@ def factor_cand_test(ret, pre, cand, bs_samples, min_obs=36, print_res=False):
               f'Single-test p-values = {pval_dd.round(3)}\n'
               f'Multiple-test p-value = {round(pval_dd_mult, 3)}\n')
     
-    return (pval_mm, pval_mm_mult, pval_dd, pval_dd_mult)    
+    return (sum_mm, pval_mm, pval_mm_mult, sum_dd, pval_dd, pval_dd_mult)    
     
 def grs_test(dep_var, indep_var):
     '''

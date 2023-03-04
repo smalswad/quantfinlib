@@ -29,8 +29,14 @@ def gen_bbs_samples(data, block_length=12, k=1000, seed=12345):
 
     '''
     samples = list()
+    idx = list()
     bs = MovingBlockBootstrap(block_length, x=data, seed=seed)    
     for s in bs.bootstrap(k):
         samples.append(bs.x.reset_index(drop=True))
+        idx.append(bs.x.index)
     
-    return samples
+    # Get positions of bootstrapped indices
+    for i, samp in enumerate(idx):
+        idx[i] = [data.index.get_loc(x) for x in samp]
+    
+    return (samples, idx)
