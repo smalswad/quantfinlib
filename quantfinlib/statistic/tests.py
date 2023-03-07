@@ -5,12 +5,15 @@ Created on Fri Jan 27 14:28:24 2023
 @author: smalswad
 """
 import itertools
+import tqdm
+import multiprocessing as mp
 import numpy as np
 import pandas as pd
 from scipy import stats
 from scipy.special import binom
 
 from quantfinlib.statistic.regression import LinearRegression
+from quantfinlib.statistic.tests_parallel_function import _run_boot
 from quantfinlib.utils.arrays import k_max
 
 def calc_raw_pval(t, tvals):
@@ -29,7 +32,7 @@ def calc_raw_pval(t, tvals):
     univariate p-value.
 
     '''
-    return (len(tvals[tvals >= t]) + 1)/(len(tvals) + 1)
+    return ((tvals[tvals >= t]).sum() + 1)/(len(tvals) + 1)
 
 def fdp_k_fwer(z, z_null, gamma, alpha=0.05, n_max=50, disp=False):
     '''
@@ -77,13 +80,20 @@ def fdp_k_fwer(z, z_null, gamma, alpha=0.05, n_max=50, disp=False):
 
     return (fwe_res, k)
 
-def factor_cand_test(ret, pre, cand, bs_indices, min_obs=36, print_res=False):
+def factor_cand_test(ret, pre, cand, bs_indices, min_obs=36, print_res=False,
+                     parallel=False):
     '''
     Factor test to identify significant factors of candidate set. Based on
     
     Harvey, C. R., & Liu, Y. (2021). Lucky factors. 
     Journal of Financial Economics, 141(2), 413-435.
-
+    
+    including multiple hypothesis tests based on 
+    
+    Romano, J. P., & Wolf, M. (2016). Efficient computation of adjusted 
+    p-values for resampling-based stepdown multiple testing. 
+    Statistics & Probability Letters, 113, 38-40. 
+    
     Parameters
     ----------
     ret : pd.DataFrame, shape(T, N)
@@ -100,25 +110,26 @@ def factor_cand_test(ret, pre, cand, bs_indices, min_obs=36, print_res=False):
         default is 36.
     print_res : boolean, optional
         Indicate whether results shall be printed. the default is False.
+    parallel : boolean, optional
+        Indicate whether bootstrapped calculations shall be run parallel. 
+        The default is False.
 
     Returns
     -------
-    sum_mm : np.array, shape(kc,)
+    statistics : pd.DataFrame, shape(kc,2)
         test statistics of factor candidates being relevant contendors based on
-        means.
-    pval_mm : np.array, shape(kc,)
-        P-values of factor candidates being relevant contendors based on mean
-        statistics.
-    pval_mm_mult : float
-        P-value for multiple testing based on mean statistics.
-    sum_dd : np.array, shape(kc,)
-        test statistics of factor candidates being relevant contendors based on
-        medians.
-    pval_dd : np.array, shape(kc,)
-        P-values of factor candidates being relevant contendors based on median
-        statistics.
-    pval_dd_mult : float
-        p-value for multiple testing based on median statistic.
+        means (column 0) and medians (column 1).
+    pvals : pd.DataFrame, shape(kc,2)
+        P-values of factor candidates being relevant contendors based on mean 
+        (c0) and median (c1) statistics, repsectively.
+    mht_res : pd.DataFrame, shape(y,2x6)
+        MHT results based on Romano & Wolf for negative t-stats only. Contains 
+        t-stats, single p-values and multiple test p-values based on mean and 
+        median based test statistics.
+    mult_pval_min : tuple
+        P-values of factor candidates with smallest pvalue after accounting for
+        multiple testing based on mean (c0) and median (c1) statistics, 
+        respectively. These pvalues are as defined in Harvey & Liu.
 
     '''
    
@@ -133,32 +144,49 @@ def factor_cand_test(ret, pre, cand, bs_indices, min_obs=36, print_res=False):
     
     ##### Bootstrap #######
     bslen = len(bs_indices)        
-    boot_mm = list() # mc x b_size matrix of mean-based test statistics under null; rows are factors; columns are bootstrap samples
-    boot_dd = list() # mc x b_size matrix of mean-based test statistics under null; rows are factors; columns are bootstrap samples
     
     # Calculate orthogonal factor candidates, i.e. here just adjust mean
-    res = _regress(pre.values, cand)
+    res = _regress(pre.values, cand.values)
     fac_cand = pd.DataFrame(cand.values - res.intercept_,
                             columns=cand.columns) 
     
-    # Iterate over bootstrap samples
-    for i, boot in enumerate(bs_indices):
+    if parallel:
+    ### RUN PARALLEL LOOP ###
+        loop_res = list()
+        pool = mp.Pool(mp.cpu_count()-1) 
+        parallel_res_objs = [
+            pool.apply_async(_run_boot, args=(bs_indices[i], ret, pre,
+                                              fac_cand, min_obs)) 
+            for i in range(bslen)]
         
-        if i % 100 == 0:
-            print(f'Calculating {i}-th bootstrap sample.')
-        # Get bootstrapped samples of ret, pre, and cand
-        ret_bb = ret.iloc[boot, :].reset_index(drop=True)
-        pre_bb = pre.iloc[boot, :].reset_index(drop=True)
-        cand_bb = fac_cand.iloc[boot, :].reset_index(drop=True)
+        for job in tqdm.tqdm(parallel_res_objs):
+            loop_res.append(job.get())
             
-        # Calculate  statistics
-        sum_mm_bb, sum_dd_bb = _avg_statistics(ret_bb, pre_bb, cand_bb)
-        boot_mm.append(sum_mm_bb)
-        boot_dd.append(sum_dd_bb)
+        pool.close()
+        pool.join()
+        
+        # Organize outputs
+        boot_mm = np.column_stack([loop[0] for loop in loop_res])
+        boot_dd = np.column_stack([loop[1] for loop in loop_res])
     
-    # Convert results to proper sized matrix
-    boot_mm = np.array(boot_mm).T
-    boot_dd = np.array(boot_dd).T
+    else:
+    ### RUN SEQUENTIAL LOOP ###
+        boot_mm = list() # mc x b_size matrix of mean-based test statistics under null; rows are factors; columns are bootstrap samples
+        boot_dd = list() # mc x b_size matrix of mean-based test statistics under null; rows are factors; columns are bootstrap samples
+        
+        # Iterate over bootstrap samples
+        for i, boot in enumerate(bs_indices):
+            
+            if i % 100 == 0:
+                print(f'Calculating {i}-th bootstrap sample.')
+            sum_mm_bb, sum_dd_bb = \
+                _run_boot(boot, ret, pre, fac_cand, min_obs=min_obs)
+            boot_mm.append(sum_mm_bb)
+            boot_dd.append(sum_dd_bb)
+        
+        # Convert results to proper sized matrix
+        boot_mm = np.array(boot_mm).T
+        boot_dd = np.array(boot_dd).T
     
     # Calculate single-test p-values
     pval_mm = (boot_mm < sum_mm[:, None]).sum(axis=1) / bslen
@@ -181,8 +209,45 @@ def factor_cand_test(ret, pre, cand, bs_indices, min_obs=36, print_res=False):
               f'Single-test 5-th percentile = {np.quantile(boot_dd, 0.05, axis=0).round(3)}\n'
               f'Single-test p-values = {pval_dd.round(3)}\n'
               f'Multiple-test p-value = {round(pval_dd_mult, 3)}\n')
+   
+    # Collect test statistics
+    statistics = pd.DataFrame(np.column_stack((sum_mm, sum_dd)),
+                              columns=['mean-based', 'median-based'],
+                              index=cand.columns)
     
-    return (sum_mm, pval_mm, pval_mm_mult, sum_dd, pval_dd, pval_dd_mult)    
+    # Collect single-test p-values
+    pvals = pd.DataFrame(np.column_stack((pval_mm, pval_dd)),
+                         columns=['mean-based', 'median-based'],
+                         index=cand.columns)
+    
+    # Calculate multiple-test p-values based on Romano and Wolf (2016) but use
+    # only negative t-stats, i.e. factors actually improving the model.
+    # Use negative t-stats in order to prioritize factors reducing mean alpha
+    # the most with two-sided test (i.e. set absolute=False)
+    
+    # Mean-based
+    mm_i = sum_mm < 0
+    mm_res = pd.DataFrame(mht_adj_pvalues(-sum_mm[mm_i], -boot_mm.T[:, mm_i],
+                                          absolute=False, digits=16),
+                          index=cand.columns[mm_i],
+                          columns=['t-stat', 'pval', 'mht_pval'])
+    mm_res['t-stat'] = -mm_res['t-stat']
+    
+    # Median based
+    dd_i = sum_dd < 0
+    dd_res = pd.DataFrame(mht_adj_pvalues(-sum_dd[dd_i], -boot_dd.T[:, dd_i],
+                                          absolute=False, digits=16),
+                          index=cand.columns[dd_i],
+                          columns=['t-stat', 'pval', 'mht_pval'])
+    dd_res['t-stat'] = -dd_res['t-stat']         
+    
+    mht_res = pd.concat([mm_res, dd_res], axis=1, names=['method', 'metric'],
+                        keys=['mean-based', 'median-based']).sort_index()
+    
+    # Original multiple-test p-values 
+    mult_pval_min = (pval_mm_mult, pval_dd_mult)
+    
+    return (statistics, pvals, mht_res, mult_pval_min)    
     
 def grs_test(dep_var, indep_var):
     '''
@@ -371,7 +436,7 @@ def k_fwe(z, z_null, k, alpha=0.05, n_max=50, digits=5):
             'step_rej': step_rej[~np.isnan(step_rej)], 
             'crit_val': [round(x, digits) for x in crit_val]}
 
-def mht_adj_pvalues(tval, tval_boot, digits=3):
+def mht_adj_pvalues(tval, tval_boot, digits=8, absolute=True):
     '''
     Multiple hypothesis correction of p-values based on
     
@@ -402,9 +467,10 @@ def mht_adj_pvalues(tval, tval_boot, digits=3):
         raise ValueError("Length of tval and column number of tval_boot do"
                          " not match!")
    
-    # Ensure absolute t-statistics
-    tval = np.absolute(tval)
-    tval_boot = np.absolute(tval_boot)
+    if absolute:
+        # Ensure absolute t-statistics
+        tval = np.absolute(tval)
+        tval_boot = np.absolute(tval_boot)
     
     # Calculate raw p-values
     pval_raw = np.array([calc_raw_pval(tval[i], tval_boot[:,i]) \
@@ -567,5 +633,4 @@ def _regress(xx, yy):
     res = model.fit(xx, yy)
     
     return res
-
 
