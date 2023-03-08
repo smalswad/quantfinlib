@@ -32,7 +32,7 @@ def calc_raw_pval(t, tvals):
     univariate p-value.
 
     '''
-    return ((tvals[tvals >= t]).sum() + 1)/(len(tvals) + 1)
+    return ((tvals >= t).sum() + 1)/(len(tvals) + 1)
 
 def fdp_k_fwer(z, z_null, gamma, alpha=0.05, n_max=50, disp=False):
     '''
@@ -189,12 +189,12 @@ def factor_cand_test(ret, pre, cand, bs_indices, min_obs=36, print_res=False,
         boot_dd = np.array(boot_dd).T
     
     # Calculate single-test p-values
-    pval_mm = (boot_mm < sum_mm[:, None]).sum(axis=1) / bslen
-    pval_dd = (boot_dd < sum_dd[:, None]).sum(axis=1) / bslen
+    pval_mm = ((boot_mm < sum_mm[:, None]).sum(axis=1) + 1) / (bslen + 1)
+    pval_dd = ((boot_dd < sum_dd[:, None]).sum(axis=1) + 1) / (bslen + 1)
     
     # Calculate multiple-test p-values
-    pval_mm_mult = (boot_mm.min(axis=0) < sum_mm.min()).sum() / bslen
-    pval_dd_mult = (boot_dd.min(axis=0) < sum_dd.min()).sum() / bslen
+    pval_mm_mult = ((boot_mm.min(axis=0) < sum_mm.min()).sum()+1) / (bslen + 1)
+    pval_dd_mult = ((boot_dd.min(axis=0) < sum_dd.min()).sum()+1) / (bslen + 1)
     
     if print_res:
         print(f'Output:\n'
@@ -220,24 +220,21 @@ def factor_cand_test(ret, pre, cand, bs_indices, min_obs=36, print_res=False,
                          columns=['mean-based', 'median-based'],
                          index=cand.columns)
     
-    # Calculate multiple-test p-values based on Romano and Wolf (2016) but use
-    # only negative t-stats, i.e. factors actually improving the model.
+    # Calculate multiple-test p-values based on Romano and Wolf (2016) 
     # Use negative t-stats in order to prioritize factors reducing mean alpha
     # the most with two-sided test (i.e. set absolute=False)
     
     # Mean-based
-    mm_i = sum_mm < 0
-    mm_res = pd.DataFrame(mht_adj_pvalues(-sum_mm[mm_i], -boot_mm.T[:, mm_i],
+    mm_res = pd.DataFrame(mht_adj_pvalues(-sum_mm, -boot_mm.T,
                                           absolute=False, digits=16),
-                          index=cand.columns[mm_i],
+                          index=cand.columns,
                           columns=['t-stat', 'pval', 'mht_pval'])
     mm_res['t-stat'] = -mm_res['t-stat']
     
     # Median based
-    dd_i = sum_dd < 0
-    dd_res = pd.DataFrame(mht_adj_pvalues(-sum_dd[dd_i], -boot_dd.T[:, dd_i],
+    dd_res = pd.DataFrame(mht_adj_pvalues(-sum_dd, -boot_dd.T,
                                           absolute=False, digits=16),
-                          index=cand.columns[dd_i],
+                          index=cand.columns,
                           columns=['t-stat', 'pval', 'mht_pval'])
     dd_res['t-stat'] = -dd_res['t-stat']         
     
