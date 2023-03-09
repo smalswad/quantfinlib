@@ -7,6 +7,40 @@ Created on Fri Jan 27 13:07:41 2023
 
 import numpy as np
 
+def calc_hhi(weights):
+    '''
+    Calculate Herfindahl Hirsch index.
+
+    Parameters
+    ----------
+    grp : pd.DataFrame, shape(T,n)
+        Portfolio weights to calculate HHI from.
+
+    Returns
+    -------
+    pd.Series, shape(T,)
+        HHI for each point in time.
+
+    '''
+    return (weights**2).sum(axis=1)
+
+def calc_perc(data):
+    '''
+    Calculate relative values (percentage) based on row-sums.
+
+    Parameters
+    ----------
+    data : pd.DataFrame, shape(T,n)
+        Nominal data.
+
+    Returns
+    -------
+    pd.DataFame, shape(T,n)
+        Relative values for each point in time.
+
+    '''
+    
+    return data.divide(data.sum(axis=1), axis=0)
 def calc_return(ret, N):
     '''
     Calculate annualised return.

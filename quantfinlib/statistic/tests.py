@@ -498,6 +498,29 @@ def mht_adj_pvalues(tval, tval_boot, digits=8, absolute=True):
 
     return result.round(digits)
 
+def tstat(data, t_hat, t0):
+    '''
+    Calculate t-statistic based on estimate t_hat of value t0
+
+    Parameters
+    ----------
+    data : np.array
+        Original data.
+    t_hat : flaot
+        Estimate of true value.
+    t0 : float
+        True value to be tested.
+
+    Returns
+    -------
+    t : float
+        T-statistic.
+
+    '''
+   
+    t = (t_hat - t0) / (np.std(data)/np.sqrt(len(data)))
+    return t
+
 def _avg_statistics(ret, pre, cand, min_obs=36):
     '''
     Helper function for factor_cand_test(). Calculate average (mean- and median-based)

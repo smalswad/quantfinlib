@@ -17,6 +17,58 @@ from quantfinlib.portfolio.portfolio import risk_comp
 #Create mapping dict for data frequencies
 FREQUENCIES = {"monthly": 12, "weekly": 52, "daily": 252}
 
+class CAPM(object):
+    '''
+    Construct CAPM model
+    PARAMETERS:
+        rf          [float] - risk free rate
+        ret_m       [df]    - market returns
+        ret_stock   [df]    - stock returns
+    '''
+    def __init__(self, rf, ret_m, ret_stock):
+        if rf is not None:
+            self.rf = rf
+        else:
+            self.rf = 0
+        self.ret_m = ret_m.astype(np.float64)
+        self.ret_stock = ret_stock.astype(np.float64)
+        self.alpha = np.NAN
+        self.alpha_se = np.NAN
+        self.alpha_tvalue = np.NAN
+        self.beta = np.NAN
+        self.beta_se = np.NAN
+        self.beta_tvalue = np.NAN
+        self.conf_int = np.NAN
+        self.rsqr = np.NAN
+        self.start = max(self.ret_m.index[0], self.ret_stock.index[0])
+        self.end = min(self.ret_m.index[-1], self.ret_stock.index[-1])
+        
+    def evaluate(self, alpha_inc = True, conf_alpha=0.05, hyp='x1=1'):
+        '''
+        Estimate model parameters: alpha, beta, tstats (H0: alpha=0, beta=1), conf_int, rsqr
+        Returns beta, if called directly
+        '''
+        x = np.array(self.ret_m.sort_index()) - self.rf
+        y = np.array(self.ret_stock.sort_index()) - self.rf
+        if alpha_inc == True:
+            x = sm.add_constant(x)
+        model = sm.OLS(y,x, missing='drop')
+        results = model.fit()
+        
+        #save estimation results and tstats
+        self.beta = results.params[-1]
+        self.beta_se = results.bse[-1]
+        self.beta_tvalue = results.t_test(hyp).tvalue[-1][0]
+        if alpha_inc==True:
+            self.alpha = results.params[0]
+            self.alpha_se = results.bse[0]
+            self.alpha_tvalue = results.tvalues[0]
+        
+        self.conf_int = results.conf_int(alpha=conf_alpha)
+        self.rsqr = results.rsquared
+        
+        return self.beta
+
 class FactorModel(object):
     '''
     Attributes:

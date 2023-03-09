@@ -6,6 +6,7 @@ Created on Fri Jan 27 14:25:37 2023
 """
 from scipy import stats
 from sklearn import linear_model
+from statsmodels.iolib.summary2 import summary_col
 
 import numpy as np
 import pandas as pd
@@ -112,12 +113,14 @@ class MultiFactorModel:
         if not self.alpha_inc:
             reg_formula = reg_formula + '-1'
         
-        self.model = sm.formula.ols(formula=reg_formula, data=self.reg_data).fit()
+        self.model = sm.formula.ols(
+            formula=reg_formula, data=self.reg_data).fit()
         self.coef = self.model.params.rename('coef')
         self.se = self.model.bse.rename('se')
         self.tvalues = self.model.tvalues.rename('tval')
         self.rsqr = self.model.rsquared
-        self.conf_int = self.model.conf_int(alpha=conf_alpha).rename({0:'lb',1:'ub'}, axis=1)
+        self.conf_int = self.model.conf_int(
+            alpha=conf_alpha).rename({0:'lb',1:'ub'}, axis=1)
         
         
         
@@ -182,3 +185,80 @@ def multiple_ols(dep_var, indep_var, incl_alpha=True):
             'tstats':   pd.concat(tstats, axis=1),
             'se':       pd.concat(se, axis=1)}
   
+def ols_to_table(regData, regFormulas, path, subset=None, 
+                 filename='RegResults', stars=True, float_fmt='%0.3f',
+                 model_names=(), reg_order = (), toLatex=True,
+                 print_details=False, scale_alpha=None):
+    ''' 
+    Parameters
+    ----------
+    regData : pd.DataFrame
+        Data frame containing all regression related data.
+    regFormulas : list
+        List of strings describing the OLS regression equation. Regressors and 
+        dependanvt variable have to be the same as regData column names.
+    path : string
+        Output directory path.
+    subset : array_like
+        An array-like object of booleans, integers, or index values that 
+        indicate the subset of df to use in the model.
+    filename : string
+        Filename of regression output
+    stars : boolean
+        Indicator to include starts in the output table
+    float_fmt : string
+        Format of decimals in the output table
+    model_names : list_like
+        Names of the specified models, columnwise
+    reg_order : list_like
+        Order of the output regressors from top to bottom. Unmentioned regressors 
+        will be added at the bottom.
+    toLatex : boolean
+        Indicates whether output should be saved in latex format   
+    print_details : boolean, optinal
+        Print details for each regressions
+    Returns
+    -------
+    None.
+    
+    '''
+    pathlib.Path(path).mkdir(parents=True, exist_ok=True)
+    
+    modelList = list()
+    #Loop over regression formulas
+    for i, reg in enumerate(regFormulas): 
+        
+        if subset is not None:
+            reg_data = regData[subset[:,i]]
+        else:
+            reg_data = regData
+            
+        model = sm.formula.ols(formula=reg, data=reg_data)
+        model_results = model.fit()  
+        modelList.append(model_results)
+        
+        #Print model details as well
+        if print_details:
+            with open(path + filename + '__' + reg + '.txt', 'w') as f:
+                f.write(model_results.summary().as_text())
+        
+    #Create output summary table
+    summaryTable = summary_col(
+        modelList, 
+        model_names=model_names, 
+        stars=stars, 
+        float_format=float_fmt, 
+        regressor_order=reg_order,
+        info_dict={'Obs':lambda x: "{0:d}".format(int(x.nobs))},
+        scale_intercept=scale_alpha
+        )
+        
+    # Determine output format
+    if toLatex:
+        summaryTable = summaryTable.as_latex()
+    else:
+        summaryTable = summaryTable.as_text()
+    
+    # Save results as text file
+    with open(path + filename + '.txt', 'w') as f:
+        f.write(summaryTable)
