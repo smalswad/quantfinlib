@@ -41,6 +41,7 @@ def calc_perc(data):
     '''
     
     return data.divide(data.sum(axis=1), axis=0)
+
 def calc_return(ret, N):
     '''
     Calculate annualised return.
@@ -50,7 +51,7 @@ def calc_return(ret, N):
     ret : pd.Series, shape (T,)
         Return series.
     N : int
-        Number of observations per year, i.e. 250 for daily or 52 for monthly
+        Number of observations per year, i.e. 250 for daily or 12 for monthly
         data.
 
     Returns
@@ -70,7 +71,7 @@ def calmar_ratio(ret,N):
     ret : pd.Series, shape (T,)
         Return series.
     N : int
-        Number of observations per year, i.e. 250 for daily or 52 for monthly
+        Number of observations per year, i.e. 250 for daily or 12 for monthly
         data.
 
     Returns
@@ -107,6 +108,9 @@ def expected_shortfall(returns, confidence_level=.05):
 	# ES is the average of the worst losses (under var)
 	return returns[returns.lt(var)].mean()
 
+def information_ratio(x, bm, N=12):
+    return (calc_return(x, N) - calc_return(bm, N))/ tracking_error(x, bm, N=N)
+    
 def max_drawdown(ret):
     '''
     Calculate maximum drawdown
@@ -137,7 +141,7 @@ def sharpe_ratio(ret, N, rf=None):
     ret : pd.Series, shape (T,)
         Return data.
     N : int
-        Number of observations per year, i.e. 250 for daily or 52 for monthly
+        Number of observations per year, i.e. 250 for daily or 12 for monthly
     rf : series, optional
         Risk-free rate. The default is None.
 
@@ -163,7 +167,7 @@ def sortino_ratio(series, N):
     series : pd.Series, shape(T,)
         Return series.
     N : int
-        Number of observations per year, i.e. 250 for daily or 52 for monthly 
+        Number of observations per year, i.e. 250 for daily or 12 for monthly 
         data.
     Returns
     -------
@@ -175,6 +179,33 @@ def sortino_ratio(series, N):
     std_neg = series[series<0].std()*np.sqrt(N)
     
     return mean/std_neg
+
+def tracking_error(x, bm, N=None):
+    '''
+    Calculate (annualized) tracking error of x to (multiple) benchmark(s)
+
+    Parameters
+    ----------
+    x : pd.Series, shape(T,)
+        Return series of portfolio of interest.
+    bm : pd.DataFrame, shape(T,n)
+        Return series for n benchmarks.
+    N : int, optional
+        Number of observations per year, i.e. 250 for daily or 12 for monthly.
+        The default is None (no annualization).
+
+    Returns
+    -------
+    te : pd.Series
+        Tracking errors of x to different benchmarks.
+
+    '''
+    te = (-bm.subtract(x, axis='rows')).std()
+    
+    if N is not None:
+        te = te*np.sqrt(N)
+    
+    return te
 
 def value_at_risk(returns, confidence_level=.05):
 	"""
