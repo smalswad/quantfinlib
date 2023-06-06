@@ -6,6 +6,7 @@ Created on Fri Jan 27 13:07:41 2023
 """
 
 import numpy as np
+import pandas as pd
 
 def calc_hhi(weights):
     '''
@@ -109,6 +110,26 @@ def expected_shortfall(returns, confidence_level=.05):
 	return returns[returns.lt(var)].mean()
 
 def information_ratio(x, bm, N=12):
+    '''
+    Calculate anualized information ratio for x to benchmark(s). Can handle
+    either multiple strategies x or multiple benchmarks. 
+
+    Parameters
+    ----------
+    x : pd.DataFrame, shape(T,k)
+        Return series of k portfolio(s) of interest.
+    bm : pd.DataFrame, shape(T,n)
+        Return series for n benchmark(s).
+    N : int, optional
+        Number of observations per year, e.g., 250 for daily or 12 for monthly.
+        The default is 12.
+
+    Returns
+    -------
+    pd.Series
+        Annualized information ratios for x to benchmark.
+
+    '''
     return (calc_return(x, N) - calc_return(bm, N))/ tracking_error(x, bm, N=N)
     
 def max_drawdown(ret):
@@ -134,14 +155,14 @@ def max_drawdown(ret):
    
 def sharpe_ratio(ret, N, rf=None):
     '''
-    Calculate annualised shapre ratio
+    Calculate annualized sharpe ratio
 
     Parameters
     ----------
     ret : pd.Series, shape (T,)
         Return data.
     N : int
-        Number of observations per year, i.e. 250 for daily or 12 for monthly
+        Number of observations per year, e.g., 250 for daily or 12 for monthly
     rf : series, optional
         Risk-free rate. The default is None.
 
@@ -160,14 +181,14 @@ def sharpe_ratio(ret, N, rf=None):
 
 def sortino_ratio(series, N):
     '''
-    Calculate annualised sortino ratio
+    Calculate annualized sortino ratio
 
     Parameters
     ----------
     series : pd.Series, shape(T,)
         Return series.
     N : int
-        Number of observations per year, i.e. 250 for daily or 12 for monthly 
+        Number of observations per year, e.g., 250 for daily or 12 for monthly 
         data.
     Returns
     -------
@@ -182,26 +203,31 @@ def sortino_ratio(series, N):
 
 def tracking_error(x, bm, N=None):
     '''
-    Calculate (annualized) tracking error of x to (multiple) benchmark(s)
+    Calculate (annualized) tracking error of x to (multiple) benchmark(s). The
+    function can handle either multiple input strategies or multiple benchmakrs.
 
     Parameters
     ----------
-    x : pd.Series, shape(T,)
-        Return series of portfolio of interest.
+    x : pd.DataFra,e, shape(T,k)
+        Return series ofkl portfolio(s) of interest.
     bm : pd.DataFrame, shape(T,n)
         Return series for n benchmarks.
     N : int, optional
-        Number of observations per year, i.e. 250 for daily or 12 for monthly.
+        Number of observations per year, e.g., 250 for daily or 12 for monthly.
         The default is None (no annualization).
 
     Returns
     -------
     te : pd.Series
-        Tracking errors of x to different benchmarks.
+        Tracking errors of x to benchmark(s).
 
-    '''
-    te = (-bm.subtract(x, axis='rows')).std()
-    
+    ''' 
+    if (isinstance(x, pd.Series) or
+        (isinstance(x, pd.DataFrame) and x.shape[1]==1)):
+            te = (-bm.subtract(x, axis='rows')).std()
+    elif isinstance(x, pd.DataFrame):
+        te = x.subtract(bm, axis='rows').std()
+
     if N is not None:
         te = te*np.sqrt(N)
     
@@ -222,7 +248,7 @@ def value_at_risk(returns, confidence_level=.05):
 			
 	Returns
 	-------
-	var : pandas.Series
+	var : pd.Series
 		Value at Risk for each time series.
 	
 	"""
@@ -232,20 +258,20 @@ def value_at_risk(returns, confidence_level=.05):
 
 def volatility(ret, N):
     '''
-    Calculate annualised volatility
+    Calculate annualized volatility
 
     Parameters
     ----------
     ret : pd.Series, shape(T,)
         Return series.
     N : int
-        Number of observations per year, i.e. 250 for daily or 52 for monthly 
+        Number of observations per year, e.g., 250 for daily or 12 for monthly 
         data.
 
     Returns
     -------
     pd.Series
-        Annualised volatility.
+        Annualized volatility.
 
     '''
     

@@ -10,7 +10,8 @@ import matplotlib.pyplot as plt
 from matplotlib import dates
 
 def plot_line(data, filepath, title=None, ylabel=None, scale='linear',
-              filename='line.png', year_interval=1, fill_area=None):
+              filename='line.png', year_interval=1, fill_area=None,
+              colors=None):
     '''
     Create line plot for given data.
 
@@ -31,7 +32,10 @@ def plot_line(data, filepath, title=None, ylabel=None, scale='linear',
     year_interval : int, optional
         Ticker interval for x-axis labels. The default is 1. 
     fill_area : pd.Series of boolean, optional
-        Series indicating highlighted background (to be shaded grey). The default is None.
+        Series indicating highlighted background (to be shaded grey).
+        The default is None.
+    colors : list, optional
+        Colors used for plotting. The default is None. 
 
     Returns
     -------
@@ -45,13 +49,18 @@ def plot_line(data, filepath, title=None, ylabel=None, scale='linear',
     
     if fill_area is not None:
         fill_area = fill_area.loc[data.index]
-        ax.fill_between(fill_area.index, y1=ymin, y2=ymax, where=fill_area, alpha=0.4, 
-                        facecolor='grey')
+        ax.fill_between(fill_area.index, y1=ymin, y2=ymax, where=fill_area,
+                        alpha=0.4, facecolor='grey')
     
     ax.plot(data.index, data, label=data.columns)
     ax.set_axisbelow(True)
     ax.grid(True, which='major', linewidth=1)
     
+    # Set colors if specified
+    if colors is not None:
+        for i,j in enumerate(ax.lines):
+            j.set_color(colors[i])
+        
     #Configurate xaxis
     ax.set_xlim([data.index.min(), data.index.max()])
     years = dates.YearLocator(year_interval)
