@@ -110,7 +110,6 @@ def plot_regime_model(regimes, zscores, filepath, filename='regime_model.png',
     title : string, optional
         Title name of the graphic. The default is None.
 
-
     '''
     # Prepare data and concat regimes with scores
     df = pd.concat([regimes, zscores], axis=1).dropna()
@@ -155,9 +154,7 @@ def plot_regime_model(regimes, zscores, filepath, filename='regime_model.png',
     ax.set_title(title)
     ax.set_ylabel('z-score')
     ax.set_ylim([ymin, ymax])
-    
-    
-    
+
     # Configurate legend
     def make_proxy(regime, cm, **kwargs):
         color = cm.get(regime)

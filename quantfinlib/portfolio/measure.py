@@ -81,7 +81,10 @@ def calmar_ratio(ret,N):
         Calmar ratio.
 
     '''
-    return calc_return(ret, N)/abs(max_drawdown(ret))
+    mdd = abs(max_drawdown(ret))    
+    cr = calc_return(ret, N)/mdd if mdd != 0 else np.nan
+    
+    return cr
 
 def expected_shortfall(returns, confidence_level=.05):
 	"""
