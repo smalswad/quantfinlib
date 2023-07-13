@@ -17,17 +17,18 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 
 class LinearRegression(linear_model.LinearRegression):
 
-    def __init__(self,*args,**kwargs):
-        # *args is the list of arguments that might go into the LinearRegression object
-        # that we don't know about and don't want to have to deal with. Similarly, **kwargs
-        # is a dictionary of key words and values that might also need to go into the orginal
-        # LinearRegression object. We put *args and **kwargs so that we don't have to look
-        # these up and write them down explicitly here. Nice and easy.
+    # def __init__(self,*args,**kwargs):
 
-        if not "fit_intercept" in kwargs:
-            kwargs['fit_intercept'] = False
+    #     if not "fit_intercept" in kwargs:
+    #         kwargs['fit_intercept'] = False
 
-        super().__init__(*args,**kwargs)
+    #     super().__init__(*args,**kwargs)
+    
+    def __init__(self, *, fit_intercept=False, copy_X=True, n_jobs=None, 
+                 positive=False):
+
+        super().__init__(fit_intercept=fit_intercept, copy_X=copy_X,
+                         n_jobs=n_jobs, positive=positive)
 
     # Adding in t-statistics for the coefficients.
     def fit(self,x,y):
