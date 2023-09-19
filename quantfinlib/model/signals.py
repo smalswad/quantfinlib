@@ -47,4 +47,12 @@ def constr_timeseries_momentum(ret, k=1, j=12):
     tsfm_short = f_tsm.where(s <= 0).sum(axis=1) / s.where(s <= 0).sum(axis=1)
     tsfm = tsfm_long - tsfm_short
     
-    return positions, tsfm.dropna()
+    # Calculate standardized weights
+    wl = s.where(s>0).divide(s.where(s>0).sum(axis=1), axis=0)
+    ws = -s.where(s<0).divide(s.where(s<0).sum(axis=1), axis=0)
+    weights = wl.copy()
+    weights[weights.isnull()] = ws
+    
+    return (positions,
+            tsfm.dropna(),
+            weights.shift().dropna(how='all', axis=0))
