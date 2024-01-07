@@ -8,9 +8,21 @@ Created on Sun Jan  7 14:18:00 2024
 import numpy as np
 import pandas as pd
 
-from math import log, sqrt, exp
+from math import sqrt, exp, pi
 from scipy import stats
+from scipy.integrate import quad
+from typeguard import typechecked
 
+
+def dN(x):
+    ''' PDF of standard normal random variable x.'''
+    return exp(-0.5 * x ** 2) / sqrt(2 * pi)
+
+def N(d):
+    ''' CDF of standard normal random variable x. '''
+    return quad(lambda x: dN(x), -20, d, limit=50)[0]
+
+@typechecked
 class EuropeanOption(object):
     ''' Class for European options in BSM Model.
     
@@ -39,7 +51,16 @@ class EuropeanOption(object):
         return implied volatility given option quote
     '''
     
-    def __init__(self, S0, K, t, M, r, sigma, otype='call'):
+    def __init__(
+            self,
+            S0: float,
+            K: float,
+            t: pd.Timestamp,
+            M: pd.Timestamp,
+            r: float,
+            sigma: float,
+            otype='call'
+    ):
         self.S0 = float(S0)
         self.K = K
         self.t = t
@@ -47,8 +68,7 @@ class EuropeanOption(object):
         self.r = r
         self.sigma = sigma
         self.otype = otype
-        
-        
+                
     def _update_ttm(self):
         ''' Updates time-to-maturity self.T. '''
         if self.t > self.M:
@@ -57,7 +77,7 @@ class EuropeanOption(object):
         
     def _d1(self):
         ''' Helper function to calculate d1 of BSM model. '''
-        nom = np.log(self.S0/self.K)+(self.r+ 0.5*self.sigma**2)*self.T
+        nom = np.log(self.S0/self.K)+(self.r + 0.5*self.sigma**2)*self.T
         denom = self.sigma*sqrt(self.T)
         
         self.d1 = nom/denom
@@ -69,10 +89,72 @@ class EuropeanOption(object):
     def _calc_value(self):
         ''' Helper function to calculate option value'''
         
-        value = (self.S0 * stats.norm.cdf(self.d1, 0.0, 1.0) \
-            - self.K * exp(-self.r * self.T) * stats.norm.cdf(self.d2, 0.0, 1.0))
-        return value
+        call_value = (self.S0*stats.norm.cdf(self.d1, 0.0, 1.0) \
+                 - self.K*exp(-self.r*self.T)*stats.norm.cdf(self.d2, 0.0, 1.0))
+            
+        if self.otype == 'call':
+            return call_value
+        else:              
+            # Calculate put value via put-call parity
+            return call_value - self.S0 + self.K*exp(-self.r*self.T)
+    
+    def _greeks_delta(self):
+        ''' Calculate option delta '''
+        if self.otype == 'call':
+            self.delta = N(self.d1)
+        else:
+            self.delta = N(self.d1) - 1
+    
+    def _greeks_gamma(self):
+        ''' Calculate option gamma '''
+        self.gamma = dN(self.d1)/self.S0*self.sigma*sqrt(self.T)
+    
+    def _greeks_vega(self):
+        ''' Calculate option vega '''
+        self.vega = self.S0*dN(self.d1)*sqrt(self.T)
         
+    def _greeks_theta(self):
+        ''' Calculate option theta '''
+        fraction = -(self.S0*dN(self.d1)*self.sigma)/(2*sqrt(self.T))
+    
+        if self.otype == 'call':
+            self.theta = fraction - self.r*self.K*exp(-self.r*self.T)*N(self.d2)            
+        else:
+            self.theta = fraction + self.r*self.K*exp(-self.r*self.T)*N(-self.d2)
+    
+    def _greeks_rho(self):
+        ''' Calculate option rho'''
+        if self.otype == 'call':
+            self.rho = self.K*self.T*exp(-self.r*self.T)*N(self.d2)        
+        else:
+            self.rho = -self.K*self.T*exp(-self.r*self.T)*N(-self.d2) 
+    
+    def get_greeks(self):
+        '''
+        Calculate option greeks.
+
+        Returns
+        -------
+        float
+            Option delta (dV dS).
+        float
+            Option gamma (d2V d2S).
+        float
+            Option vega (dV dSigma).
+        float
+            Option theta (dV dt).
+        float
+            Option rho (dV dr).
+
+        '''
+        self._greeks_delta()
+        self._greeks_gamma()
+        self._greeks_vega()
+        self._greeks_theta()
+        self._greeks_rho()        
+        
+        return self.delta, self.gamma, self.vega, self.theta, self.rho
+    
     def __call__(self):
         '''
         Override call funtion to create function object, i.e., call other
@@ -81,7 +163,7 @@ class EuropeanOption(object):
         Returns
         -------
         value : float
-            Fair option value accoirding to BSM model.
+            Fair option value according to BSM model.
 
         '''
         
@@ -89,16 +171,25 @@ class EuropeanOption(object):
         self._update_ttm()
         self._d1()
         self._d2()
+        self.value = self._calc_value()
         
-        return self._calc_value()
+        return self.value
         
 # =============================================================================
 # Test only
 # =============================================================================
 if __name__ == '__main__':
-    euro_call = EuropeanOption(S0=110, K=100, t=pd.Timestamp('30-09-2014'),
-                               M=pd.Timestamp('30-09-2018'), r=0.01, sigma=0.2)
+    euro_opt = EuropeanOption(S0=100, K=100, t=pd.Timestamp('30-09-2014'),
+                               M=pd.Timestamp('30-09-2015'), r=0.05, sigma=0.2,
+                               otype='put')
+    value = euro_opt()
+    delta, gamma, vega, theta, rho = euro_opt.get_greeks()
     
-    print(f"The value of the {euro_call.otype}-option is: {euro_call():.2f}")
+    print(f"The value of the {euro_opt.otype}-option is: {value:.2f}")
+    print(f"The option's delta is: {delta:.2f}")
+    print(f"The option's gamma is: {gamma:.2f}")
+    print(f"The option's vega is: {theta:.2f}")
+    print(f"The option's theta is: {theta:.2f}")
+    print(f"The option's rho is: {rho:.2f}")
     
     
