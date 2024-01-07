@@ -5,18 +5,20 @@ Created on Sun Jan  7 14:18:00 2024
 @author: Alexander Swade
 """
 
+import math
 import numpy as np
 import pandas as pd
 
-from math import sqrt, exp, pi
+from math import sqrt, exp
 from scipy import stats
 from scipy.integrate import quad
+from scipy.optimize import fmin
 from typeguard import typechecked
 
 
 def dN(x):
     ''' PDF of standard normal random variable x.'''
-    return exp(-0.5 * x ** 2) / sqrt(2 * pi)
+    return exp(-0.5 * x ** 2) / sqrt(2 * math.pi)
 
 def N(d):
     ''' CDF of standard normal random variable x. '''
@@ -129,6 +131,38 @@ class EuropeanOption(object):
         else:
             self.rho = -self.K*self.T*exp(-self.r*self.T)*N(-self.d2) 
     
+    def implied_vol(self, price, sigma_est=0.2):
+        '''
+        Calculate implied volatility for given market price price P0 of the 
+        option.
+
+        Parameters
+        ----------
+        price : float
+            Market price of option.
+        sigma_est : float, optional
+            Initial volatility guess. The default is 0.2.
+        
+        Returns
+        -------
+        float
+            Implied volatility based on given market price of option.
+
+        '''
+        
+        # Define nested function used for root finding
+        def calc_diff(sigma):
+            # Create option and evaluate price based on estimated volatility
+            option = EuropeanOption(self.S0, self.K, self.t, self.M, self.r,
+                                    sigma[0], self.otype)
+            option()
+
+            return (option.value - price)**2
+        
+        iv = fmin(calc_diff, [sigma_est])[0]
+        
+        return iv
+    
     def get_greeks(self):
         '''
         Calculate option greeks.
@@ -179,17 +213,25 @@ class EuropeanOption(object):
 # Test only
 # =============================================================================
 if __name__ == '__main__':
-    euro_opt = EuropeanOption(S0=100, K=100, t=pd.Timestamp('30-09-2014'),
-                               M=pd.Timestamp('30-09-2015'), r=0.05, sigma=0.2,
+    euro_opt = EuropeanOption(S0=60, K=65, t=pd.Timestamp('30-09-2014'),
+                               M=pd.Timestamp('30-12-2014'), r=0.08, sigma=0.3,
                                otype='put')
     value = euro_opt()
     delta, gamma, vega, theta, rho = euro_opt.get_greeks()
+    p0 = 8
+    impl_vol = euro_opt.implied_vol(p0, sigma_est=0.25)
     
     print(f"The value of the {euro_opt.otype}-option is: {value:.2f}")
     print(f"The option's delta is: {delta:.2f}")
     print(f"The option's gamma is: {gamma:.2f}")
-    print(f"The option's vega is: {theta:.2f}")
+    print(f"The option's vega is: {vega:.2f}")
     print(f"The option's theta is: {theta:.2f}")
     print(f"The option's rho is: {rho:.2f}")
+    print(f"The option's implied volatility at P0 = {p0} is {impl_vol:.4f}")
+    
+    
+    
+    
+    
     
     
