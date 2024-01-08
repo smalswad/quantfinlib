@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 
 from matplotlib import dates
 
-def plot_line(data, filepath, title=None, ylabel=None, scale='linear',
+def plot_line(data, filepath=None, title=None, ylabel=None, scale='linear',
               filename='line.png', year_interval=1, fill_area=None,
               colors=None):
     '''
