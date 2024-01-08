@@ -74,7 +74,7 @@ class OptionBase(object):
         
         else:
             raise ValueError("Values passed to 't' and 'M' need to be of "
-                             "same data type (float or pd.Timestamp")
+                             "same data type (float or pd.Timestamp)")
 
 @typechecked
 class EuropeanOptionBSM(OptionBase):
@@ -241,7 +241,8 @@ class EuropeanOptionCRR(OptionBase):
     def __init__(self, N:int, **kwargs):
         super().__init__(**kwargs)
         self.N = N
-        self.dt = (self.M - self.t)/self.N # length of each time interval
+        self._update_ttm()
+        self.dt = self.T/self.N # length of each time interval
         self.df = exp(-self.r * self.dt) # discount per interval
         
     def _inner_value(self, S):
@@ -267,28 +268,34 @@ class EuropeanOptionCRR(OptionBase):
             
         return V
     
-    def _calc_value(self):
-        # Calculate up, down, and probability q according to the CRR model
-        u = exp(self.sigma*sqrt(self.dt))
-        d = 1/u
-        q = (exp(self.r*self.dt) - d)/(u - d)
+    def _calc_binomial_parameter(self):
+        ''' Helper function to calculate up, down, and probability q according
+        to the CRR model. Returns stock price matrix S. '''
+        self.u = exp(self.sigma*sqrt(self.dt))
+        self.d = 1/self.u
+        self.q = (exp(self.r*self.dt) - self.d)/(self.u - self.d)
         
         # Initialize arrays to calculate binomial model
         mu = np.arange(self.N + 1)
         mu = np.resize(mu, (self.N + 1, self.N + 1))
         md = np.transpose(mu)
-        mu = u**(mu - md)
-        md = d**md
+        mu = self.u**(mu - md)
+        md = self.d**md
         S = self.S0*mu*md
+        
+        return S
+    
+    def _calc_value(self):
+        S = self._calc_binomial_parameter()
         
         # Calculate initial option values
         V = self._inner_value(S)
         
-        # Fill inner values iteratively backwards
+        # Fill inner values via backwards iteration
         z = 0
         for t in range(self.N-1, -1, -1):
-            V[0:self.N - z, t] = \
-                (q*V[0:self.N-z, t+1] + (1 - q)*V[1:self.N-z+1, t+1])*self.df
+            V[0:self.N - z, t] = (self.q*V[0:self.N-z, t+1] \
+                                  + (1 - self.q)*V[1:self.N-z+1, t+1])*self.df
             z += 1
         
         self.inner_values = V
@@ -336,8 +343,8 @@ if __name__ == '__main__':
     
     
     ''' TEST 2: CRR model valuation '''
-    crr_opt = EuropeanOptionCRR(N=5, S0=60, K=65, t=0, M=0.25, r=0.08, sigma=0.3,
-                                otype='put')
+    crr_opt = EuropeanOptionCRR(N=5, S0=60, K=65, t=0., M=0.25, r=0.08,
+                                sigma=0.3, otype='put')
     value_crr = crr_opt()
     print(f"The value of the {crr_opt.otype}-option is: {value_crr:.2f}")
     
