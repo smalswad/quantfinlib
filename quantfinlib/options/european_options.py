@@ -268,7 +268,7 @@ class EuropeanOptionCRR(OptionBase):
             
         return V
     
-    def _calc_binomial_parameter(self):
+    def _simulate_underlying_process(self):
         ''' Helper function to calculate up, down, and probability q according
         to the CRR model. Returns stock price matrix S. '''
         self.u = exp(self.sigma*sqrt(self.dt))
@@ -286,7 +286,7 @@ class EuropeanOptionCRR(OptionBase):
         return S
     
     def _calc_value(self):
-        S = self._calc_binomial_parameter()
+        S = self._simulate_underlying_process()
         
         # Calculate initial option values
         V = self._inner_value(S)
