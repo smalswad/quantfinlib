@@ -235,6 +235,18 @@ class EuropeanOptionCRR(OptionBase):
     ==========
     N : int
         Number of time intervals
+    S0 : float
+        initial stock/index level
+    K : float
+        strike price
+    t : datetime/Timestamp object
+        pricing date
+    M : datetime/Timestamp object
+        maturity date
+    r : float
+        constant risk-free short rate
+    sigma : float
+        volatility factor in diffusion term
         
     '''
     
@@ -310,12 +322,10 @@ class EuropeanOptionCRR(OptionBase):
         Returns
         -------
         value : float
-            Fair option value according to CRR model.
+            Fair option value according to class model.
 
-        '''
-        value = self._calc_value()
-        
-        return value
+        '''        
+        return  self._calc_value()
         
     
 

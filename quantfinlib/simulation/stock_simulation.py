@@ -85,8 +85,8 @@ class StockSim():
         # Vectorized implementation of asset path generation
         asset_paths = np.exp(
             (self.mu - self.sigma**2 / 2) * self.dt +
-            self.sigma * np.random.normal(0, math.sqrt(self.dt),
-                                          size=(self.N, self.paths))
+            self.sigma * math.sqrt(self.dt) * np.random.normal(
+                0, 1, size=(self.N, self.paths))
         )
         
         # Add array of 1's
@@ -143,6 +143,7 @@ class StockSim():
             self._save_as_csv(data)
         else:
             return data
+
 
 # =============================================================================
 # Test only
