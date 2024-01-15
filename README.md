@@ -6,5 +6,6 @@ This repository contains a set of functions and classes used for my quantitative
 - Multiple hypothesis tests (fdp, k-fwer, ...)
 - Optimization (Minimization problems, Black-Litterman, ...)
 - Data loading (French's website, Open Asset Pricing, JKPFactors, ...)
+- Option pricing (BSM model, Least-square Monte Carlo Primal + Dual, ...)
 - Utilities (pd.DataFrames, np.arrays, lists, dicts, ...)
 - others
