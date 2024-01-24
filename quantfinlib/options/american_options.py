@@ -306,8 +306,6 @@ class AmericanOptionLSMDual(AmericanOptionLSMPrimal):
         self.k_nmcs = k_nmcs
         
     def _calc_value(self):
-        
-                
         ''' 
         Simulate underlying paths and polynomial coefficient via backward
         iteration (Primal algorithm) 
