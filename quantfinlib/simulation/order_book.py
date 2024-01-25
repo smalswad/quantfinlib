@@ -52,7 +52,7 @@ class OrderBook():
     def _push_buy(self, quant, price):        
         new_quant = quant
         while ((self.best_ask <= price) 
-               and (len(self.bids) > 0)
+               and (len(self.asks) > 0)
                and (new_quant > 0)
                ):
             # Get best bid quantity and clear at price
@@ -69,7 +69,7 @@ class OrderBook():
                 new_quant -= best_quant
                 
                 # Find new best ask
-                self.best_ask = sorted(self.bids.keys())[0]
+                self.best_ask = sorted(self.asks.keys())[0]
         
         if new_quant > 0:                    
             self.bids[price] = none_to_zero(self.bids.get(price)) + new_quant
@@ -82,7 +82,11 @@ class OrderBook():
     def _update_best_bid(self, new_price):
         if new_price > self.best_bid:
             self.best_bid = new_price
-            
+    
+    def _update_volumes(self):
+        self.best_ask_volume = none_to_zero(self.asks.get(self.best_ask))
+        self.best_bid_volume= none_to_zero(self.bids.get(self.best_bid))
+        
     def process_order(self, order):
         quant = order['quantity']
         price = order['price']
@@ -93,7 +97,7 @@ class OrderBook():
         elif direc == 'buy':
             self._push_buy(quant, price)
         
-        
+        self._update_volumes()
 
 
 
